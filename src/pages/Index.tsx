@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, ThumbsUp, ThumbsDown, Share2, Download, MoreHorizontal } from "lucide-react";
 import VideoPlayer from "@/components/VideoPlayer";
 import ChannelCard from "@/components/ChannelCard";
+import SidebarChannel from "@/components/SidebarChannel";
 import CategoryFilter from "@/components/CategoryFilter";
+import CommentSection from "@/components/CommentSection";
 import { channels, categories } from "@/data/channels";
 import type { Channel } from "@/data/channels";
 
@@ -10,6 +12,7 @@ const Index = () => {
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
+  const [descExpanded, setDescExpanded] = useState(false);
 
   const filtered = useMemo(() => {
     return channels.filter((ch) => {
@@ -23,7 +26,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 h-14 flex items-center gap-4">
+        <div className="max-w-[1800px] mx-auto px-3 sm:px-6 h-14 flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">📺</span>
             <h1 className="text-lg font-bold text-foreground hidden sm:block">PinoyTV</h1>
@@ -46,52 +49,177 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
-        {/* Player Section */}
-        {activeChannel && (
-          <div className="mb-6">
-            <div className="max-w-4xl">
-              <VideoPlayer channel={activeChannel} />
-              <div className="mt-3">
-                <h2 className="text-xl font-bold text-foreground capitalize">{activeChannel.title}</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="bg-[hsl(var(--live-badge))] text-foreground text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-                    LIVE
-                  </span>
-                  <span className="text-sm text-muted-foreground">{activeChannel.category}</span>
+      {/* WATCH MODE - Desktop: Player left + sidebar right | Mobile: stacked */}
+      {activeChannel ? (
+        <main className="max-w-[1800px] mx-auto px-0 md:px-6 py-0 md:py-6">
+          <div className="flex flex-col lg:flex-row gap-0 lg:gap-6">
+            {/* Left Column - Player + Info + Comments */}
+            <div className="flex-1 min-w-0">
+              {/* Video Player */}
+              <div className="lg:rounded-xl overflow-hidden">
+                <VideoPlayer channel={activeChannel} />
+              </div>
+
+              {/* Video Info - YouTube style */}
+              <div className="px-3 md:px-0 mt-3">
+                <h2 className="text-lg md:text-xl font-bold text-foreground capitalize">
+                  {activeChannel.title}
+                </h2>
+
+                {/* Channel info + actions row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3">
+                  {/* Channel avatar + name */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-bold text-sm uppercase">
+                      {activeChannel.title.slice(0, 2)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground capitalize">{activeChannel.title}</p>
+                      <p className="text-xs text-muted-foreground">{activeChannel.category}</p>
+                    </div>
+                    <span className="bg-[hsl(var(--live-badge))] text-foreground text-[10px] font-bold px-2 py-0.5 rounded uppercase ml-1">
+                      LIVE
+                    </span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                    <div className="flex items-center bg-secondary rounded-full">
+                      <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-foreground hover:bg-[hsl(var(--channel-hover))] rounded-l-full transition-colors">
+                        <ThumbsUp className="w-4 h-4" />
+                        <span className="text-xs">Like</span>
+                      </button>
+                      <div className="w-px h-6 bg-border" />
+                      <button className="flex items-center px-3 py-2 text-foreground hover:bg-[hsl(var(--channel-hover))] rounded-r-full transition-colors">
+                        <ThumbsDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button className="flex items-center gap-1.5 bg-secondary px-3 py-2 rounded-full text-sm text-foreground hover:bg-[hsl(var(--channel-hover))] transition-colors">
+                      <Share2 className="w-4 h-4" />
+                      <span className="text-xs hidden sm:inline">Share</span>
+                    </button>
+                    <button className="flex items-center gap-1.5 bg-secondary px-3 py-2 rounded-full text-sm text-foreground hover:bg-[hsl(var(--channel-hover))] transition-colors">
+                      <Download className="w-4 h-4" />
+                      <span className="text-xs hidden sm:inline">Save</span>
+                    </button>
+                    <button className="flex items-center bg-secondary p-2 rounded-full text-foreground hover:bg-[hsl(var(--channel-hover))] transition-colors">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Description box */}
+                <div
+                  className="mt-3 bg-secondary rounded-xl p-3 cursor-pointer hover:bg-[hsl(var(--channel-hover))] transition-colors"
+                  onClick={() => setDescExpanded(!descExpanded)}
+                >
+                  <p className="text-xs font-medium text-foreground">Live now • Streaming</p>
+                  {descExpanded ? (
+                    <div className="mt-1">
+                      <p className="text-sm text-foreground">
+                        Panoorin ang {activeChannel.title} live stream. Category: {activeChannel.category}.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">Show less</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">...more</p>
+                  )}
+                </div>
+
+                {/* Comments - Desktop */}
+                <div className="hidden md:block pb-10">
+                  <CommentSection />
                 </div>
               </div>
             </div>
+
+            {/* Right Column - Recommended channels sidebar (desktop) */}
+            <div className="hidden lg:block w-[402px] min-w-[402px]">
+              <div className="mb-3">
+                <CategoryFilter
+                  categories={categories}
+                  active={activeCategory}
+                  onSelect={setActiveCategory}
+                />
+              </div>
+              <div className="space-y-2">
+                {filtered
+                  .filter((ch) => ch.id !== activeChannel.id)
+                  .map((ch) => (
+                    <SidebarChannel
+                      key={ch.id}
+                      channel={ch}
+                      isActive={false}
+                      onClick={() => {
+                        setActiveChannel(ch);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    />
+                  ))}
+              </div>
+            </div>
+
+            {/* Mobile: channel list below player */}
+            <div className="lg:hidden px-3 mt-4">
+              {/* Comments on mobile */}
+              <div className="md:hidden">
+                <CommentSection />
+              </div>
+
+              <div className="mt-6 mb-3">
+                <CategoryFilter
+                  categories={categories}
+                  active={activeCategory}
+                  onSelect={setActiveCategory}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6">
+                {filtered
+                  .filter((ch) => ch.id !== activeChannel.id)
+                  .map((ch) => (
+                    <ChannelCard
+                      key={ch.id}
+                      channel={ch}
+                      isActive={false}
+                      onClick={() => {
+                        setActiveChannel(ch);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    />
+                  ))}
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Category Filter */}
-        <div className="mb-4">
-          <CategoryFilter
-            categories={categories}
-            active={activeCategory}
-            onSelect={setActiveCategory}
-          />
-        </div>
-
-        {/* Channel Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filtered.map((ch) => (
-            <ChannelCard
-              key={ch.id}
-              channel={ch}
-              isActive={activeChannel?.id === ch.id}
-              onClick={() => setActiveChannel(ch)}
+        </main>
+      ) : (
+        /* BROWSE MODE - Channel grid (YouTube home) */
+        <main className="max-w-[1800px] mx-auto px-3 sm:px-6 py-4 md:py-6">
+          <div className="mb-4">
+            <CategoryFilter
+              categories={categories}
+              active={activeCategory}
+              onSelect={setActiveCategory}
             />
-          ))}
-        </div>
-
-        {filtered.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-muted-foreground text-lg">Walang nahanap na channel</p>
           </div>
-        )}
-      </main>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+            {filtered.map((ch) => (
+              <ChannelCard
+                key={ch.id}
+                channel={ch}
+                isActive={false}
+                onClick={() => setActiveChannel(ch)}
+              />
+            ))}
+          </div>
+
+          {filtered.length === 0 && (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">Walang nahanap na channel</p>
+            </div>
+          )}
+        </main>
+      )}
     </div>
   );
 };
