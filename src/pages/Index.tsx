@@ -52,11 +52,11 @@ const Index = () => {
       {/* WATCH MODE - Desktop: Player left + sidebar right | Mobile: stacked */}
       {activeChannel ? (
         <main className="max-w-[1800px] mx-auto px-0 md:px-6 py-0 md:py-6">
-          <div className="flex flex-col lg:flex-row gap-0 lg:gap-6">
-            {/* Left Column - Player + Info + Comments */}
-            <div className="flex-1 min-w-0">
-              {/* Video Player - sticky */}
-              <div className="sticky top-14 z-40 lg:rounded-xl overflow-hidden bg-background">
+        <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 lg:h-[calc(100vh-3.5rem)]">
+            {/* Left Column - Player + Info + Comments (scrollable together) */}
+            <div className="flex-1 min-w-0 lg:overflow-y-auto lg:scrollbar-hide">
+              {/* Video Player */}
+              <div className="sticky top-14 z-40 lg:static lg:rounded-xl overflow-hidden bg-background">
                 <VideoPlayer channel={activeChannel} />
               </div>
 
@@ -133,8 +133,8 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Right Column - Recommended channels sidebar (desktop) */}
-            <div className="hidden lg:block w-[402px] min-w-[402px]">
+            {/* Right Column - Recommended channels sidebar (desktop, independent scroll) */}
+            <div className="hidden lg:block w-[402px] min-w-[402px] overflow-y-auto">
               <div className="mb-3">
                 <CategoryFilter
                   categories={categories}
@@ -202,7 +202,7 @@ const Index = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
             {filtered.map((ch) => (
               <ChannelCard
                 key={ch.id}
