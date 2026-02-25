@@ -21,12 +21,16 @@ const ChannelCard = ({ channel, isActive, onClick }: ChannelCardProps) => {
       <div
         className="aspect-video w-full flex items-center justify-center relative"
         style={{
-          background: `linear-gradient(135deg, hsl(${hue}, 40%, 20%), hsl(${(hue + 60) % 360}, 30%, 12%))`,
+          background: channel.logo ? undefined : `linear-gradient(135deg, hsl(${hue}, 40%, 20%), hsl(${(hue + 60) % 360}, 30%, 12%))`,
         }}
       >
-        <span className="text-3xl font-bold uppercase opacity-40 tracking-widest text-foreground">
-          {channel.title.slice(0, 3)}
-        </span>
+        {channel.logo ? (
+          <img src={channel.logo} alt={channel.title} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-3xl font-bold uppercase opacity-40 tracking-widest text-foreground">
+            {channel.title.slice(0, 3)}
+          </span>
+        )}
         {isActive && (
           <span className="absolute top-2 right-2 bg-[hsl(var(--live-badge))] text-foreground text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
             LIVE

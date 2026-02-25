@@ -55,7 +55,7 @@ const Index = () => {
         <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 lg:h-[calc(100vh-3.5rem)]">
             {/* Left Column - Player + Info + Comments (scrollable together) */}
             <div className="flex-1 min-w-0 lg:overflow-y-auto lg:scrollbar-hide">
-              {/* Video Player */}
+              {/* Video Player - sticky on mobile, static on desktop */}
               <div className="sticky top-14 z-40 lg:static lg:rounded-xl overflow-hidden bg-background">
                 <VideoPlayer channel={activeChannel} />
               </div>

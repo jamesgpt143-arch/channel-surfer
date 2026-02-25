@@ -20,12 +20,16 @@ const SidebarChannel = ({ channel, isActive, onClick }: SidebarChannelProps) => 
       <div
         className="w-[168px] min-w-[168px] aspect-video rounded-lg flex items-center justify-center relative overflow-hidden"
         style={{
-          background: `linear-gradient(135deg, hsl(${hue}, 40%, 20%), hsl(${(hue + 60) % 360}, 30%, 12%))`,
+          background: channel.logo ? undefined : `linear-gradient(135deg, hsl(${hue}, 40%, 20%), hsl(${(hue + 60) % 360}, 30%, 12%))`,
         }}
       >
-        <span className="text-lg font-bold uppercase opacity-40 tracking-widest text-foreground">
-          {channel.title.slice(0, 3)}
-        </span>
+        {channel.logo ? (
+          <img src={channel.logo} alt={channel.title} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-lg font-bold uppercase opacity-40 tracking-widest text-foreground">
+            {channel.title.slice(0, 3)}
+          </span>
+        )}
         {isActive && (
           <span className="absolute top-1 right-1 bg-[hsl(var(--live-badge))] text-foreground text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
             LIVE
