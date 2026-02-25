@@ -4,6 +4,7 @@ export interface Channel {
   manifest: string;
   keys: { kid: string; key: string }[];
   category: string;
+  logo?: string;
 }
 
 const categorize = (title: string): string => {
@@ -114,6 +115,7 @@ export const channels: Channel[] = rawChannels.map((ch) => ({
   manifest: ch.Manifest,
   keys: parseKey(ch.Key),
   category: categorize(ch.Title),
+  logo: (ch as any).Logo,
 }));
 
 export const categories = ["All", ...Array.from(new Set(channels.map((c) => c.category))).sort()];
