@@ -20,16 +20,34 @@ const VideoPlayer = ({ channel }: VideoPlayerProps) => {
   useEffect(() => {
     if (!channel || !videoRef.current) return;
 
+    let cancelled = false;
+
     const initPlayer = async () => {
       setError(null);
       setLoading(true);
 
+      // Destroy previous player
       if (playerRef.current) {
         await playerRef.current.destroy();
+        playerRef.current = null;
       }
 
+      if (cancelled) return;
+
+      // Pause and reset the video element to stop any lingering audio
+      const video = videoRef.current!;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+
       const player = new shaka.Player();
-      await player.attach(videoRef.current!);
+      await player.attach(video);
+
+      if (cancelled) {
+        await player.destroy();
+        return;
+      }
+
       playerRef.current = player;
 
       // Configure ClearKey DRM
@@ -38,34 +56,47 @@ const VideoPlayer = ({ channel }: VideoPlayerProps) => {
         clearKeys[kid] = key;
       });
 
-      player.configure({
-        drm: {
-          clearKeys,
-        },
-      });
+      player.configure({ drm: { clearKeys } });
 
       player.addEventListener("error", (event: any) => {
         console.error("Shaka error:", event.detail);
-        setError("Hindi ma-load ang channel. Subukan ulit.");
-        setLoading(false);
+        if (!cancelled) {
+          setError("Hindi ma-load ang channel. Subukan ulit.");
+          setLoading(false);
+        }
       });
 
       try {
         await player.load(channel.manifest);
+        if (cancelled) {
+          await player.destroy();
+          return;
+        }
         setLoading(false);
-        videoRef.current?.play();
+        video.play().catch(() => {});
       } catch (e: any) {
         console.error("Load error:", e);
-        setError("Hindi ma-load ang channel. Subukan ulit.");
-        setLoading(false);
+        if (!cancelled) {
+          setError("Hindi ma-load ang channel. Subukan ulit.");
+          setLoading(false);
+        }
       }
     };
 
     initPlayer();
 
     return () => {
-      playerRef.current?.destroy();
-      playerRef.current = null;
+      cancelled = true;
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      // Also stop the video element directly
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute("src");
+        videoRef.current.load();
+      }
     };
   }, [channel]);
 
@@ -102,7 +133,6 @@ const VideoPlayer = ({ channel }: VideoPlayerProps) => {
         ref={videoRef}
         className="w-full h-full"
         controls
-        autoPlay
       />
     </div>
   );
