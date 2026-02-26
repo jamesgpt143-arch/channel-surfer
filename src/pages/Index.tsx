@@ -1,18 +1,22 @@
 import { useState, useMemo } from "react";
-import { Search, ThumbsUp, ThumbsDown, Share2, Download, MoreHorizontal } from "lucide-react";
+import { Search, ThumbsUp, ThumbsDown, Share2, Download, MoreHorizontal, User, LogOut } from "lucide-react";
 import VideoPlayer from "@/components/VideoPlayer";
 import ChannelCard from "@/components/ChannelCard";
 import SidebarChannel from "@/components/SidebarChannel";
 import CategoryFilter from "@/components/CategoryFilter";
 import CommentSection from "@/components/CommentSection";
+import AuthDialog from "@/components/AuthDialog";
 import { channels, categories } from "@/data/channels";
 import type { Channel } from "@/data/channels";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user, displayName, signOut } = useAuth();
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [descExpanded, setDescExpanded] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return channels.filter((ch) => {
@@ -43,11 +47,28 @@ const Index = () => {
               />
             </div>
           </div>
-          <div className="text-xs text-muted-foreground hidden md:block">
-            {channels.length} channels
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden md:block">
+              {channels.length} channels
+            </span>
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-foreground hidden sm:inline">{displayName}</span>
+                <button onClick={signOut} className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground" title="Logout">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setAuthOpen(true)} className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium hover:opacity-90 transition-opacity">
+                <User className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Login</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
+
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
 
       {/* WATCH MODE - Desktop: Player left + sidebar right | Mobile: stacked */}
       {activeChannel ? (

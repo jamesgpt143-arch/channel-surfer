@@ -1,45 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { MessageSquare, ThumbsUp, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import AuthDialog from "./AuthDialog";
 
-interface Comment {
+interface CommentData {
   id: string;
-  user: string;
-  avatar: string;
+  channel_id: string;
+  user_id: string;
   text: string;
-  time: number; // timestamp
   likes: number;
-  likedByMe: boolean;
+  created_at: string;
+  display_name: string;
 }
 
-const STORAGE_KEY = "pinoytv_comments";
-
-const getStoredComments = (channelId: string): Comment[] => {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return data[channelId] || [];
-  } catch {
-    return [];
-  }
-};
-
-const saveComments = (channelId: string, comments: Comment[]) => {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    data[channelId] = comments;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {}
-};
-
-const seedComments: Omit<Comment, "id">[] = [
-  { user: "Juan dela Cruz", avatar: "JD", text: "Ganda ng stream! Crystal clear ang quality 🔥", time: Date.now() - 120000, likes: 12, likedByMe: false },
-  { user: "Maria Santos", avatar: "MS", text: "Salamat sa free live TV! Ang dami pang channels", time: Date.now() - 300000, likes: 8, likedByMe: false },
-  { user: "Pedro Reyes", avatar: "PR", text: "May bagong channel ba na dadagdag dito?", time: Date.now() - 600000, likes: 3, likedByMe: false },
-  { user: "Ana Garcia", avatar: "AG", text: "Super smooth ng playback, walang buffer!", time: Date.now() - 900000, likes: 21, likedByMe: false },
-  { user: "Carlo Mendoza", avatar: "CM", text: "Paborito ko talaga yung sports channels dito 💪", time: Date.now() - 1200000, likes: 5, likedByMe: false },
-];
-
-const formatTime = (timestamp: number): string => {
-  const diff = Date.now() - timestamp;
+const formatTime = (timestamp: string): string => {
+  const diff = Date.now() - new Date(timestamp).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;
@@ -54,73 +30,114 @@ interface CommentSectionProps {
 }
 
 const CommentSection = ({ channelId }: CommentSectionProps) => {
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState(true);
   const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<CommentData[]>([]);
+  const [myLikes, setMyLikes] = useState<Set<string>>(new Set());
+  const [authOpen, setAuthOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Load comments for this channel
+  // Fetch comments with profile display names
+  const fetchComments = useCallback(async () => {
+    const { data } = await supabase
+      .from("comments")
+      .select("id, channel_id, user_id, text, likes, created_at")
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: false });
+
+    if (!data) return;
+
+    // Fetch profile names for all unique user_ids
+    const userIds = [...new Set(data.map((c: any) => c.user_id))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", userIds);
+
+    const nameMap = new Map((profiles || []).map((p: any) => [p.id, p.display_name]));
+
+    setComments(
+      data.map((c: any) => ({
+        ...c,
+        display_name: nameMap.get(c.user_id) || "User",
+      }))
+    );
+  }, [channelId]);
+
+  // Fetch my likes
+  const fetchMyLikes = useCallback(async () => {
+    if (!user) { setMyLikes(new Set()); return; }
+    const { data } = await supabase
+      .from("comment_likes")
+      .select("comment_id")
+      .eq("user_id", user.id);
+    setMyLikes(new Set((data || []).map((l: any) => l.comment_id)));
+  }, [user]);
+
   useEffect(() => {
-    const stored = getStoredComments(channelId);
-    if (stored.length > 0) {
-      setComments(stored);
-    } else {
-      // Seed with default comments
-      const seeded = seedComments.map((c, i) => ({ ...c, id: `seed-${i}` }));
-      setComments(seeded);
-      saveComments(channelId, seeded);
-    }
-  }, [channelId]);
+    fetchComments();
+    fetchMyLikes();
+  }, [fetchComments, fetchMyLikes]);
 
-  const addComment = useCallback(() => {
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel(`comments-${channelId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments", filter: `channel_id=eq.${channelId}` },
+        () => fetchComments()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [channelId, fetchComments]);
+
+  const addComment = useCallback(async () => {
     if (!commentText.trim()) return;
-    const newComment: Comment = {
-      id: `user-${Date.now()}`,
-      user: "You",
-      avatar: "U",
+    if (!user) { setAuthOpen(true); return; }
+    setLoading(true);
+    await supabase.from("comments").insert({
+      channel_id: channelId,
+      user_id: user.id,
       text: commentText.trim(),
-      time: Date.now(),
-      likes: 0,
-      likedByMe: false,
-    };
-    const updated = [newComment, ...comments];
-    setComments(updated);
-    saveComments(channelId, updated);
+    });
     setCommentText("");
-  }, [commentText, comments, channelId]);
+    setLoading(false);
+  }, [commentText, user, channelId]);
 
-  const toggleLike = useCallback((id: string) => {
-    setComments((prev) => {
-      const updated = prev.map((c) =>
-        c.id === id
-          ? { ...c, likedByMe: !c.likedByMe, likes: c.likedByMe ? c.likes - 1 : c.likes + 1 }
-          : c
-      );
-      saveComments(channelId, updated);
-      return updated;
-    });
-  }, [channelId]);
+  const toggleLike = useCallback(async (commentId: string) => {
+    if (!user) { setAuthOpen(true); return; }
+    const liked = myLikes.has(commentId);
+    if (liked) {
+      await supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", user.id);
+      setMyLikes((prev) => { const next = new Set(prev); next.delete(commentId); return next; });
+    } else {
+      await supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id });
+      setMyLikes((prev) => new Set(prev).add(commentId));
+    }
+    fetchComments();
+  }, [user, myLikes, fetchComments]);
 
-  const deleteComment = useCallback((id: string) => {
-    setComments((prev) => {
-      const updated = prev.filter((c) => c.id !== id);
-      saveComments(channelId, updated);
-      return updated;
-    });
-  }, [channelId]);
+  const deleteComment = useCallback(async (id: string) => {
+    await supabase.from("comments").delete().eq("id", id);
+  }, []);
+
+  const getInitials = (name: string) => {
+    return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  };
 
   return (
     <div className="mt-6">
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 mb-4"
       >
         <MessageSquare className="w-5 h-5 text-foreground" />
         <span className="text-foreground font-medium">{comments.length} Comments</span>
-        {expanded ? (
-          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        )}
+        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
 
       {expanded && (
@@ -128,29 +145,24 @@ const CommentSection = ({ channelId }: CommentSectionProps) => {
           {/* Comment Input */}
           <div className="flex gap-3 mb-6">
             <div className="w-10 h-10 min-w-[40px] rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
-              U
+              {user ? getInitials(user.user_metadata?.display_name || "U") : "?"}
             </div>
             <div className="flex-1">
               <input
                 type="text"
-                placeholder="Mag-comment..."
+                placeholder={user ? "Mag-comment..." : "Mag-login para maka-comment..."}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
+                onFocus={() => { if (!user) setAuthOpen(true); }}
                 onKeyDown={(e) => e.key === "Enter" && addComment()}
                 className="w-full bg-transparent border-b border-border text-foreground py-2 text-sm outline-none focus:border-foreground placeholder:text-muted-foreground transition-colors"
               />
               {commentText && (
                 <div className="flex justify-end gap-2 mt-2">
-                  <button
-                    onClick={() => setCommentText("")}
-                    className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full"
-                  >
+                  <button onClick={() => setCommentText("")} className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full">
                     Cancel
                   </button>
-                  <button
-                    onClick={addComment}
-                    className="text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-full font-medium hover:opacity-90"
-                  >
+                  <button onClick={addComment} disabled={loading} className="text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-full font-medium hover:opacity-90 disabled:opacity-50">
                     Comment
                   </button>
                 </div>
@@ -163,31 +175,26 @@ const CommentSection = ({ channelId }: CommentSectionProps) => {
             {comments.map((c) => (
               <div key={c.id} className="flex gap-3 group">
                 <div className="w-10 h-10 min-w-[40px] rounded-full bg-accent flex items-center justify-center text-accent-foreground text-xs font-bold">
-                  {c.avatar}
+                  {getInitials(c.display_name)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground">
-                      {c.user === "You" ? "You" : `@${c.user.replace(/ /g, "").toLowerCase()}`}
+                      {c.user_id === user?.id ? "You" : `@${c.display_name.replace(/ /g, "").toLowerCase()}`}
                     </span>
-                    <span className="text-xs text-muted-foreground">{formatTime(c.time)}</span>
+                    <span className="text-xs text-muted-foreground">{formatTime(c.created_at)}</span>
                   </div>
                   <p className="text-sm text-foreground mt-0.5">{c.text}</p>
                   <div className="flex items-center gap-4 mt-1.5">
                     <button
                       onClick={() => toggleLike(c.id)}
-                      className={`flex items-center gap-1 transition-colors ${
-                        c.likedByMe ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                      }`}
+                      className={`flex items-center gap-1 transition-colors ${myLikes.has(c.id) ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <ThumbsUp className="w-3.5 h-3.5" />
                       <span className="text-xs">{c.likes}</span>
                     </button>
-                    {c.user === "You" && (
-                      <button
-                        onClick={() => deleteComment(c.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                      >
+                    {c.user_id === user?.id && (
+                      <button onClick={() => deleteComment(c.id)} className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -195,6 +202,9 @@ const CommentSection = ({ channelId }: CommentSectionProps) => {
                 </div>
               </div>
             ))}
+            {comments.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Wala pang comments. Maging una kang mag-comment!</p>
+            )}
           </div>
         </>
       )}
